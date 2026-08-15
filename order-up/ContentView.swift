@@ -31,7 +31,14 @@ struct OrderItem: Identifiable {
 struct FloatingButton: Identifiable {
     let id = UUID()
     var position: CGPoint
+    var size: CGFloat
+    /// Seconds until this button jumps again. Each button runs its own
+    /// countdown, so they never move in lockstep.
+    var moveDelay: Double
     let targetIndex: Int
+
+    static func randomDelay() -> Double { .random(in: 0.15...1.1) }
+    static func randomSize() -> CGFloat { .random(in: 38...74) }
 }
 
 struct ContentView: View {
@@ -43,7 +50,9 @@ struct ContentView: View {
     @State private var hour = Calendar.current.component(.hour, from: Date())
     @State private var buttons: [FloatingButton] = []
 
-    private let drift = Timer.publish(every: 0.55, on: .main, in: .common).autoconnect()
+    /// Ticks fast; each button decides for itself when to actually move.
+    private let tickInterval = 0.1
+    private let drift = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     /// Even hour: both buttons add. Odd hour: both buttons subtract.
     private var isAddingHour: Bool { hour % 2 == 0 }
@@ -127,7 +136,7 @@ struct ContentView: View {
                     } label: {
                         // Every button looks identical — that's the guessing game.
                         Image(systemName: isAddingHour ? "plus.circle.fill" : "minus.circle.fill")
-                            .font(.system(size: 56))
+                            .font(.system(size: button.size))
                             .symbolRenderingMode(.palette)
                             .foregroundStyle(.white, isAddingHour ? .green : .red)
                             .shadow(radius: 6)
@@ -136,18 +145,40 @@ struct ContentView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .onAppear {
-                // One button per item, assigned in a shuffled order each launch.
-                buttons = [0, 1, 2].shuffled().map {
-                    FloatingButton(position: randomPoint(in: geo.size), targetIndex: $0)
+            // Driven by the size, not by onAppear: onAppear runs before the
+            // geometry is measured, so placing buttons there collapses them all
+            // onto .zero in the corner. This also re-places them on rotation.
+            .onChange(of: geo.size, initial: true) { _, size in
+                guard size.width > 0, size.height > 0 else { return }
+
+                if buttons.isEmpty {
+                    // One button per item, assigned in a shuffled order each launch.
+                    buttons = [0, 1, 2].shuffled().map {
+                        FloatingButton(
+                            position: randomPoint(in: size),
+                            size: FloatingButton.randomSize(),
+                            moveDelay: FloatingButton.randomDelay(),
+                            targetIndex: $0
+                        )
+                    }
+                } else {
+                    for index in buttons.indices {
+                        buttons[index].position = randomPoint(in: size)
+                    }
                 }
             }
             .onReceive(drift) { _ in
                 hour = Calendar.current.component(.hour, from: Date())
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    for index in buttons.indices {
+
+                for index in buttons.indices {
+                    buttons[index].moveDelay -= tickInterval
+                    guard buttons[index].moveDelay <= 0 else { continue }
+
+                    withAnimation(.easeInOut(duration: .random(in: 0.12...0.6))) {
                         buttons[index].position = randomPoint(in: geo.size)
+                        buttons[index].size = FloatingButton.randomSize()
                     }
+                    buttons[index].moveDelay = FloatingButton.randomDelay()
                 }
             }
         }
@@ -169,7 +200,12 @@ struct ContentView: View {
         teh = 0
         toast = 0
         buttons = zip(buttons, [0, 1, 2].shuffled()).map {
-            FloatingButton(position: $0.position, targetIndex: $1)
+            FloatingButton(
+                position: $0.position,
+                size: $0.size,
+                moveDelay: $0.moveDelay,
+                targetIndex: $1
+            )
         }
     }
 
