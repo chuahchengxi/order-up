@@ -8,11 +8,9 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var a = 0
+    @State private var milo = 0
     @State private var teh = 0
     @State private var toast = 0
-    @State private var flag = false
-    @State private var tmp = 0
     @State private var arr: [String] = []
 
     var body: some View {
@@ -31,12 +29,11 @@ struct ContentView: View {
                 Text("$1.50")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(a)")
+                Text("\(milo)")
                     .font(.title)
                     .monospacedDigit()
                 Button {
-                    teh += 1
-                    tmp = 1
+                    milo += 1
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.largeTitle)
@@ -87,7 +84,7 @@ struct ContentView: View {
             .background(Color.yellow.opacity(0.22))
             .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            Text("Total  $\(Double(a) * 1.5 + Double(toast) * 2.0, specifier: "%.2f")")
+            Text("Total  $\(Double(milo) * 1.5 + Double(toast) * 2.0 + Double(teh) * 1.2, specifier: "%.2f")")
                 .font(.title)
                 .bold()
                 .padding(.top, 8)
